@@ -31,6 +31,12 @@
 
 	/* Private define ------------------------------------------------------------*/
 	/* USER CODE BEGIN PD */
+	/* ---------------------------------------------------------------------------
+ * 5x4 Matrix Keypad Pin Mapping
+ * Rows  (R1-R5) : Outputs, driven LOW one at a time during scanning
+ * Columns (C1-C4): Inputs, read while pulled HIGH by external/internal pull-ups
+ * A pressed key connects a row to a column, pulling that column LOW
+ * ------------------------------------------------------------------------- */
 	#define R1_PORT GPIOA
 	#define R1_PIN GPIO_PIN_8
 
@@ -70,7 +76,11 @@
 
 	/* USER CODE BEGIN PV */
 	int value ;
+
+	/* Buffer that accumulates every key pressed so far, displayed on the LCD */
 	char str[20];
+
+	/* Current write index into str[] — acts as the "next free slot" pointer */
 	uint8_t memory = 0;
 	/* USER CODE END PV */
 
@@ -84,7 +94,12 @@
 
 	/* Private user code ---------------------------------------------------------*/
 	/* USER CODE BEGIN 0 */
+	/* Holds the character code returned by the most recent read_keypad() call */
 	uint8_t key;
+
+
+	/* Lookup table mapping each physical key position (row-major order)
+ * to its printable character. Index = (row * 4) + column. */
 	uint8_t KEY[]=
 	{'F','f','#','*',
 		'1','2','3','U',
@@ -93,16 +108,31 @@
 		'L','0','R','T' };
 
 
+/**
+ * @brief  Scans the 5x4 matrix keypad and returns the character of the
+ *         key currently pressed.
+ *
+ * Scanning method: one row at a time is driven LOW while all other rows
+ * are held HIGH. Each column input is then checked — if a column reads
+ * LOW, the key at the intersection of the active row and that column
+ * is being pressed. A blocking while-loop waits for key release
+ * (simple debounce), after which the character is appended to the
+ * str[] buffer and shown on the LCD.
+ *
+ * @retval Character corresponding to the pressed key, or 'N' if no
+ *         key is currently pressed in any row.
+ */
 
 	char read_keypad (void)
 	{
-	//	make ROW1 Low and ALL_CHANNELS other ROWs HIGH
+		/* ---------------- ROW 1 scan ---------------- */
+	// Drive R1 LOW, keep R2-R5 HIGH so only Row 1 can pull a column LOW
 		HAL_GPIO_WritePin (R1_PORT, R1_PIN,GPIO_PIN_RESET); //PULL R1 LOW
 		HAL_GPIO_WritePin (R2_PORT, R2_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R3_PORT, R3_PIN,GPIO_PIN_SET);//PULL Rx up
 		HAL_GPIO_WritePin (R4_PORT, R4_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R5_PORT, R5_PIN,GPIO_PIN_SET); //PULL Rx up
-		HAL_Delay(5);
+		HAL_Delay(5); // Let GPIO levels settle before reading columns
 
 
 		if(!(HAL_GPIO_ReadPin (C1_PORT, C1_PIN)))
@@ -116,21 +146,21 @@
 		return 'F';
 		}
 	if(!(HAL_GPIO_ReadPin (C2_PORT, C2_PIN))){
-		while (!(HAL_GPIO_ReadPin (C2_PORT,C2_PIN))); //// Wait until button releasedD
+		while (!(HAL_GPIO_ReadPin (C2_PORT,C2_PIN))); //// Wait until button released
 	str[memory] = KEY[1];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';  
-		lcd_gotoxy(0,0);                       // End string
-		lcd_puts(str);                               // Display key on LCD                        
+		str[memory] = '\0';                         // End string
+		lcd_gotoxy(0,0);                        // Display key on LCD
+		lcd_puts(str);                                                      
 	return 'f';
 	}
 	if(!(HAL_GPIO_ReadPin (C3_PORT, C3_PIN))){
 		while (!(HAL_GPIO_ReadPin (C3_PORT,C3_PIN))); //// Wait until button released
 	str[memory] = KEY[2];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';
-		lcd_gotoxy(0,0);                          // End string
-		lcd_puts(str);                               // Display key on LCD                           
+		str[memory] = '\0';                         // End string
+		lcd_gotoxy(0,0);                          // Display key on LCD 
+		lcd_puts(str);                                                          
 		
 	return '#';
 	}	
@@ -138,29 +168,30 @@
 		while (!(HAL_GPIO_ReadPin (C4_PORT,C4_PIN))); //// Wait until button released
 	str[memory] = KEY[3];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0'; 
-		lcd_gotoxy(0,0);                         // End string
+		str[memory] = '\0';                         // End string
+		lcd_gotoxy(0,0);                        
 		lcd_puts(str);                               // Display key on LC
 		
 	return '*';
 	}
 
 
-	//	make ROW2 Low and ALL_CHANNELS other ROWs HIGH
+	/* ---------------- ROW 2 scan ---------------- */
+	// Drive R2 LOW, keep R1,R3-R5 HIGH so only Row 2 can pull a column LOW
 		HAL_GPIO_WritePin (R1_PORT, R1_PIN,GPIO_PIN_SET); //PULL R1 UP
 		HAL_GPIO_WritePin (R2_PORT, R2_PIN,GPIO_PIN_RESET); //PULL R2 LOW
 		HAL_GPIO_WritePin (R3_PORT, R3_PIN,GPIO_PIN_SET);//PULL Rx up
 		HAL_GPIO_WritePin (R4_PORT, R4_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R5_PORT, R5_PIN,GPIO_PIN_SET); //PULL Rx up
-		HAL_Delay(5);
+		HAL_Delay(5); // Let GPIO levels settle before reading columns
 
 
 	if(!(HAL_GPIO_ReadPin (C1_PORT, C1_PIN))){
-		while (!(HAL_GPIO_ReadPin (C1_PORT,C1_PIN))); //WAIT TILL THE BUTTON IS PORESSED
+		while (!(HAL_GPIO_ReadPin (C1_PORT,C1_PIN))); //WAIT TILL THE BUTTON IS PERESSED
 str[memory] = KEY[4];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';  
-		lcd_gotoxy(0,0);                        // End string
+		str[memory] = '\0';                      // End string
+		lcd_gotoxy(0,0);                        
 		lcd_puts(str);                               // Display key on LCD
 	return '1';
 	}
@@ -168,8 +199,8 @@ str[memory] = KEY[4];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C2_PORT,C2_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 	str[memory] = KEY[5];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';
-		lcd_gotoxy(0,0);                          // End string
+		str[memory] = '\0';                          // End string
+		lcd_gotoxy(0,0);                          
 		lcd_puts(str);                               // Display key on LCD
 	return '2';
 	}	
@@ -177,9 +208,9 @@ str[memory] = KEY[4];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C3_PORT,C3_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 str[memory] = KEY[6];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0'; 
-		lcd_gotoxy(0,0);                         // End string
-		lcd_puts(str);     
+		str[memory] = '\0';                       // End string
+		lcd_gotoxy(0,0);                         
+		lcd_puts(str);                            // Display key on LCD
 	return '3';
 	}	
 	if(!(HAL_GPIO_ReadPin (C4_PORT, C4_PIN))){
@@ -192,7 +223,9 @@ str[memory] = KEY[6];                        // Store new character
 	return 'U';
 	}
 		
-		//	make ROW3 Low and ALL_CHANNELS other ROWs HIGH
+		
+	/* ---------------- ROW 3 scan ---------------- */
+	// Drive R3 LOW, keep R1,R2,R4,R5 HIGH so only Row 3 can pull a column LOW
 		HAL_GPIO_WritePin (R1_PORT, R1_PIN,GPIO_PIN_SET); //PULL R1 UP
 		HAL_GPIO_WritePin (R2_PORT, R2_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R3_PORT, R3_PIN,GPIO_PIN_RESET);//PULL R3 LOW
@@ -205,8 +238,8 @@ str[memory] = KEY[6];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C1_PORT,C1_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 str[memory] = KEY[8];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';  
-		lcd_gotoxy(0,0);                        // End string
+		str[memory] = '\0';                      // End string
+		lcd_gotoxy(0,0);                        //DISPLAY
 		lcd_puts(str);     
 	return '4';
 	}
@@ -214,8 +247,8 @@ str[memory] = KEY[8];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C2_PORT,C2_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 str[memory] = KEY[9];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';  
-		lcd_gotoxy(0,0);                        // End string
+		str[memory] = '\0';                     // End string
+		lcd_gotoxy(0,0);                        //DISPLAY
 		lcd_puts(str);     
 	return '5';
 	}	
@@ -223,8 +256,8 @@ str[memory] = KEY[9];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C3_PORT,C3_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 	str[memory] = KEY[10];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0';   
-		lcd_gotoxy(0,0);                       // End string
+		str[memory] = '\0';                        // End string
+		lcd_gotoxy(0,0);                            //DISPLAY
 		lcd_puts(str);     
 	return '6';
 	}	
@@ -232,12 +265,13 @@ str[memory] = KEY[9];                        // Store new character
 		while (!(HAL_GPIO_ReadPin (C4_PORT,C4_PIN))); //WAIT TILL THE BUTTON IS PORESSED
 	str[memory] = KEY[11];                        // Store new character
 		memory++;                                   // Move to next position
-		str[memory] = '\0'; 
-		lcd_gotoxy(0,0);                         // End string
+		str[memory] = '\0';                        // End string
+		lcd_gotoxy(0,0);                         
 		lcd_puts(str);     
 	return 'D';
 	}
-			//	make ROW4 Low and ALL_CHANNELS other ROWs HIGH
+			/* ---------------- ROW 4 scan ---------------- */
+	// Drive R4 LOW, keep R1-R3,R5 HIGH so only Row 4 can pull a column LOW
 		HAL_GPIO_WritePin (R1_PORT, R1_PIN,GPIO_PIN_SET); //PULL R1 UP
 		HAL_GPIO_WritePin (R2_PORT, R2_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R3_PORT, R3_PIN,GPIO_PIN_SET);//PULL R3 UP
@@ -282,7 +316,8 @@ str[memory] = KEY[15];                        // Store new character
 		lcd_puts(str);     
 	return 'E';
 	}	
-			//	make ROW5 Low and ALL_CHANNELS other ROWs HIGH
+				/* ---------------- ROW 5 scan ---------------- */
+	// Drive R5 LOW, keep R1-R4 HIGH so only Row 5 can pull a column LOW
 		HAL_GPIO_WritePin (R1_PORT, R1_PIN,GPIO_PIN_SET); //PULL R1 UP
 		HAL_GPIO_WritePin (R2_PORT, R2_PIN,GPIO_PIN_SET); //PULL Rx up
 		HAL_GPIO_WritePin (R3_PORT, R3_PIN,GPIO_PIN_SET);//PULL R3 UP
@@ -328,7 +363,7 @@ str[memory] = KEY[15];                        // Store new character
 
 	}
 
-
+// No column pulled LOW on any row — no key currently pressed
 	return 'N';
 		
 	}
@@ -381,7 +416,7 @@ str[memory] = KEY[15];                        // Store new character
 		while (1)
 		{
 			/* USER CODE END WHILE */
-	key = read_keypad();
+	key = read_keypad();  // Poll the keypad every loop iteration
 			
 			/* USER CODE BEGIN 3 */
 		}
